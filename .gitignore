@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+.vscode/
+coverage/
+.nyc_output/
+.DS_Store
+server/.env.example

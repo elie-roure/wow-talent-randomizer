@@ -1,0 +1,17 @@
+{
+  "name": "wow-talent-random-monorepo",
+  "private": true,
+  "scripts": {
+    "start:server": "npm --prefix server run start",
+    "dev:server": "npm --prefix server run dev",
+    "install:server": "npm --prefix server install",
+    "start:client": "npm --prefix client run dev",
+    "build:client": "npm --prefix client run build",
+    "install:client": "npm --prefix client install",
+    "build": "npm run build:client && npm --prefix server run build",
+    "dev": "concurrently \"npm run dev:server\" \"npm run start:client\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
