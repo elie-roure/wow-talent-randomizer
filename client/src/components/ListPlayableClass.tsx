@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 
-export default function TalentTreeIndex() {
+export default function ListPlayableClass() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<any>(null)
@@ -13,7 +14,14 @@ export default function TalentTreeIndex() {
       const res = await fetch('/data/wow/playable-class/index')
       if (!res.ok) throw new Error(`Server returned ${res.status}`)
       const json = await res.json()
-      setData(json)
+      // Normalize response: some backends may return an object wrapping the array (e.g. { value: [...] })
+      if (Array.isArray(json)) {
+        setData(json)
+      } else if (json && Array.isArray(json.value)) {
+        setData(json.value)
+      } else {
+        setData(json)
+      }
     } catch (err: any) {
       setError(err?.message || String(err))
     } finally {
@@ -42,8 +50,10 @@ export default function TalentTreeIndex() {
                     {Array.isArray(c.specializations)
                       ? c.specializations.map((s: any) => (
                           <li key={s.id} spec-id={s.id}>
-                            {s.name?.['fr_FR'] ?? s.name ?? JSON.stringify(s)}
-                            <img src={s.media} alt={s.name?.['fr_FR'] ?? s.name} style={{ width: 32, height: 32, marginLeft: 8, verticalAlign: 'middle' }} />
+                            <Link to={`/spec/${s.id}`} style={{ textDecoration: 'none' }}>
+                              {s.name?.['fr_FR'] ?? s.name ?? JSON.stringify(s)}
+                              <img src={s.media} alt={s.name?.['fr_FR'] ?? s.name} style={{ width: 32, height: 32, marginLeft: 8, verticalAlign: 'middle' }} />
+                            </Link>
                           </li>
                         ))
                       : null}

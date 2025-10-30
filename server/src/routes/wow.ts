@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { fetchBlizzardData } from '../services/bnetService';
+import { PlayableClass } from '../models/playableClass';
+import { enrichPlayableClass } from '../services/classService';
+import { getTalentTreeBySpecId } from '../services/talentTreeService';
 
 const router = Router();
 
@@ -9,41 +12,46 @@ router.get('/wow/playable-class/index', async (_req: Request, res: Response) => 
   try {
     const region = process.env.BNET_REGION || 'eu';
     const namespace = `static-${region}`;
-    let result = [];
 
-    // Fetch playable class index
-    const dataClass = await fetchBlizzardData('/data/wow/playable-class/index', { region, namespace, locale: 'fr_FR' });
+    const dataClass = await fetchBlizzardData('/data/wow/playable-class/index', {
+      region,
+      namespace,
+      locale: 'fr_FR',
+    });
 
-    if (dataClass && Array.isArray(dataClass['classes'])) {
-      for (const playableClass of dataClass['classes']) {
+    const result: PlayableClass[] = [];
 
-        // Enrich each playable class with its media asset
-        const dataMedia = await fetchBlizzardData(`/data/wow/media/playable-class/${playableClass.id}`, { region, namespace, locale: 'fr_FR' });
-        playableClass.media = dataMedia['assets'][0]['value'];
-
-        // Fetch specialization 
-        let specializations = [];
-        const dataSpecialization = await fetchBlizzardData(`/data/wow/playable-class/${playableClass.id}`, { region, namespace, locale: 'fr_FR' });
-
-        // Fetch each specialization's media asset
-        if (dataSpecialization && Array.isArray(dataSpecialization['specializations'])) {
-          for (const specialization of dataSpecialization['specializations']) {
-            const dataSpecMedia = await fetchBlizzardData(`/data/wow/media/playable-specialization/${specialization.id}`, { region, namespace, locale: 'fr_FR' });
-            specialization.media = dataSpecMedia['assets'][0]['value'];
-            specializations.push(specialization);
-          }
-          playableClass.specializations = specializations;
-          result.push(playableClass);
-        }
+    if (Array.isArray(dataClass?.classes)) {
+      for (const rawClass of dataClass.classes) {
+        const enrichedClass = await enrichPlayableClass(rawClass, region, namespace);
+        result.push(enrichedClass);
       }
     }
+
     res.json(result);
   } catch (err: any) {
-    // eslint-disable-next-line no-console
     console.error('Failed to fetch playable-class index:', err);
     res.status(500).json({ error: 'failed_fetching_playable_class', message: String(err) });
   }
 });
+
+
+
+
+router.get('/wow/talent-tree/spec/:specId', async (req: Request, res: Response) => {
+  try {
+    const { specId } = req.params;
+    const region = process.env.BNET_REGION || 'eu';
+    const namespace = `static-${region}`;
+
+    const talentTree = await getTalentTreeBySpecId(specId, region, namespace);
+    res.json(talentTree);
+  } catch (err: any) {
+    console.error('Failed to fetch talent tree:', err);
+    res.status(500).json({ error: 'failed_fetching_talent_tree', message: String(err) });
+  }
+});
+
 
 
 
