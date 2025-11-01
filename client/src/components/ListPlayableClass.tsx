@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 export default function ListPlayableClass() {
@@ -6,34 +6,40 @@ export default function ListPlayableClass() {
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<any>(null)
 
-  async function load() {
-    setError(null)
-    setLoading(true)
-    setData(null)
-    try {
-      const res = await fetch('/data/wow/playable-class/index')
-      if (!res.ok) throw new Error(`Server returned ${res.status}`)
-      const json = await res.json()
-      // Normalize response: some backends may return an object wrapping the array (e.g. { value: [...] })
-      if (Array.isArray(json)) {
-        setData(json)
-      } else if (json && Array.isArray(json.value)) {
-        setData(json.value)
-      } else {
-        setData(json)
+
+   useEffect(() => {
+    async function load() {
+      setError(null)
+      setLoading(true)
+      setData(null)
+      try {
+        const res = await fetch('/data/wow/playable-class/index')
+        if (!res.ok) throw new Error(`Server returned ${res.status}`)
+        const json = await res.json()
+        // Normalize response: some backends may return an object wrapping the array (e.g. { value: [...] })
+        if (Array.isArray(json)) {
+          setData(json)
+        } else if (json && Array.isArray(json.value)) {
+          setData(json.value)
+        } else {
+          setData(json)
+        }
+      } catch (err: any) {
+        setError(err?.message || String(err))
+      } finally {
+        setLoading(false)
       }
-    } catch (err: any) {
-      setError(err?.message || String(err))
-    } finally {
-      setLoading(false)
     }
-  }
+    load()
+  }, [])
+
+
 
   return (
     <div style={{ marginTop: 16 }}>
-      <button onClick={load} disabled={loading}>
-        {loading ? 'Loading...' : 'Load Playable Class Index'}
-      </button>
+      <div >
+        {loading ? 'Loading...' : ''}
+      </div>
 
       {error && <div style={{ marginTop: 12, color: 'crimson' }}>Error: {error}</div>}
 
@@ -49,13 +55,13 @@ export default function ListPlayableClass() {
                   <ul>
                     {Array.isArray(c.specializations)
                       ? c.specializations.map((s: any) => (
-                          <li key={s.id} spec-id={s.id}>
-                            <Link to={`/spec/${s.id}`} style={{ textDecoration: 'none' }}>
-                              {s.name?.['fr_FR'] ?? s.name ?? JSON.stringify(s)}
-                              <img src={s.media} alt={s.name?.['fr_FR'] ?? s.name} style={{ width: 32, height: 32, marginLeft: 8, verticalAlign: 'middle' }} />
-                            </Link>
-                          </li>
-                        ))
+                        <li key={s.id} spec-id={s.id}>
+                          <Link to={`/spec/${s.id}`} style={{ textDecoration: 'none' }}>
+                            {s.name?.['fr_FR'] ?? s.name ?? JSON.stringify(s)}
+                            <img src={s.media} alt={s.name?.['fr_FR'] ?? s.name} style={{ width: 32, height: 32, marginLeft: 8, verticalAlign: 'middle' }} />
+                          </Link>
+                        </li>
+                      ))
                       : null}
                   </ul>
                 </li>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { act, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 
 export default function SpecPage() {
@@ -47,7 +47,7 @@ export default function SpecPage() {
                     const bySpecRes = await fetch(`/data/wow/talent-tree/spec/${specId}`)
                     if (bySpecRes.ok) {
                         const bySpecJson = await bySpecRes.json()
-                        
+
                         setClassTree(bySpecJson.talentNodesClass)
                         setSpecTree(bySpecJson.talentNodesSpec)
                         setRestrictionLinesClassTree(bySpecJson.restrictionsLineClass);
@@ -162,7 +162,33 @@ export default function SpecPage() {
         if (!talent || !activeTalentIds.has(talent.id)) return;
 
         //check si des talents dépendent de ce talent
-        const dependentTalents = activeTalentIds.has(talent.unlocks[0]);
+        const dependentActiveTalents = talent.unlocks.filter((id: number) => activeTalentIds.has(id));
+
+        const canRemove = dependentActiveTalents.every((id: number) => {
+            const dependentActiveTalent = classTree.find((t: any) => t.id === id);
+            const unlockBy = dependentActiveTalent?.lockedBy ?? [];
+
+            // Vérifie s'il existe un autre talent actif qui débloque ce talent
+            const isUnlockedByOther = Array.from(activeTalentIds).some(
+                (activeId: number) => {
+
+                    let otherCanUnlock = unlockBy.includes(activeId) && activeId !== talent.id ;
+                    if(!otherCanUnlock) return false;
+
+                    //check si dans les talents qui peuvent le debloquer ils sont au rank max
+                    let activeTalent = classTree.filter((t: any) => t.id == activeId)[0];
+                    const currentRank = talentRanks.get(activeId) ?? 0;
+                    if (currentRank < activeTalent.ranks.length) return false;
+
+                    return true;
+                }
+            );
+
+            return isUnlockedByOther;
+        });
+
+        if (!canRemove) return;
+
 
         // On regroupe tout dans une mise à jour synchronisée
         setTalentRanks(prevRanks => {
