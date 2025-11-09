@@ -1,3 +1,37 @@
+.talentTree{
+  margin: 0 1vw;
+}
+
+td {
+    border: 1px solid;
+    /* padding: 8px; */
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    max-width: 5vw;
+    border-radius: 45vw;
+}
+
+td.inactive {
+    opacity: 0.2;
+    pointer-events: none;
+}
+
+td.selectable {
+    opacity: 1;
+    background-color: lightblue;
+    color: black;
+}
+
+td.active {
+    background-color: green;
+    font-weight: bold;
+}
+
+.hidden{
+    visibility: hidden;
+}
+
+/*POPUP CHOICE*/
 .popupBlur {
     position: fixed;
     top: 0;
@@ -27,27 +61,4 @@
 .popupChoice>div:hover {
     background: #add8e6;
     cursor: pointer
-}
-
-td {
-    border: 1px solid;
-    padding: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-td.inactive {
-    opacity: 0.2;
-    pointer-events: none;
-}
-
-td.selectable {
-    opacity: 1;
-    background-color: lightblue;
-    color: black;
-}
-
-td.active {
-    background-color: green;
-    font-weight: bold;
 }

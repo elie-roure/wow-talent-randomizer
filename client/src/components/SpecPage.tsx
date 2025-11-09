@@ -20,13 +20,15 @@ export default function SpecPage() {
 
     //talent tree class
     const [classTree, setClassTree] = useState<any | null>(null);
-    const [talentRanks, setTalentRanks] = useState<Map<number, number>>(new Map());
-    const [activeTalentNodeIds, setActiveTalentNodeIds] = useState<Set<number>>(new Set());
-    const [selectableTalentNodeIds, setSelectableTalentNodeIds] = useState<Set<number>>(new Set());
-    const [activeTalentIds, setActiveTalentIds] = useState<Map<number, number>>(new Map());
 
     //talent tree spec
     const [specTree, setSpecTree] = useState<any | null>(null);
+
+    //talent tree
+    const [talentRanks, setTalentRanks] = useState<Map<number, number>>(new Map());
+    const [activeTalentNodeIds, setActiveTalentNodeIds] = useState<Set<number>>(new Set());
+    const [selectableTalentNodeIds, setSelectableTalentNodeIds] = useState<Set<number>>(new Set());
+    const [activeTalentIds] = useState<Map<number, number>>(new Map());
 
 
     //recuperer les talents tree
@@ -64,11 +66,26 @@ export default function SpecPage() {
                         setRestrictionLinesClassTree(bySpecJson.restrictionsLineClass);
 
                         //Initialiser les talents de la première ligne comme sélectionnables
-                        const firstRow = Math.min(...bySpecJson.talentNodesClass.map((t: any) => t.displayRow));
-                        const firstRowIds = bySpecJson.talentNodesClass
-                            .filter((t: any) => t.displayRow === firstRow)
-                            .map((t: any) => t.id);
-                        setSelectableTalentNodeIds(new Set(firstRowIds));
+                        const newSelectable = new Set<number>();
+
+                        const firstRowClass = Math.min(
+                            ...bySpecJson.talentNodesClass
+                                .map((t: any) => t.displayRow)
+                        );
+                        bySpecJson.talentNodesClass
+                            .filter((t: any) => t.displayRow === firstRowClass)
+                            .forEach((t: any) => newSelectable.add(t.id));
+
+
+                        const firstRowSpec = Math.min(
+                            ...bySpecJson.talentNodesSpec
+                                .map((t: any) => t.displayRow)
+                        );
+                        bySpecJson.talentNodesSpec
+                            .filter((t: any) => t.displayRow === firstRowSpec)
+                            .forEach((t: any) => newSelectable.add(t.id));
+
+                        setSelectableTalentNodeIds(newSelectable);
 
 
                     } else {
@@ -109,19 +126,22 @@ export default function SpecPage() {
     const getSelectableTalents = (updatedActive: Set<number>, updatedRanks: Map<number, number>) => {
         const newSelectable = new Set<number>();
 
+        const combinedTree = [...classTree, ...specTree];
+
+
         // Toujours garder la première ligne sélectionnable
         const firstRow = Math.min(
-            ...classTree
+            ...combinedTree
                 .map((t: any) => t.displayRow)
         );
-        classTree
+        combinedTree
             .filter((t: any) => t.displayRow === firstRow)
             .forEach((t: any) => newSelectable.add(t.id));
 
 
         // Ajouter les talents débloqués par les talents actifs
         updatedActive.forEach(activeId => {
-            const activeTalent = classTree.find((t: any) => t.id === activeId);
+            const activeTalent = combinedTree.find((t: any) => t.id === activeId);
             if (!activeTalent) return;
 
             //check si le rank du talent est au max
@@ -130,7 +150,7 @@ export default function SpecPage() {
 
             // Parcourir les talents débloqués
             activeTalent?.unlocks?.forEach((id: number) => {
-                const unlockedTalent = classTree.find((t: any) => t.id === id);
+                const unlockedTalent = combinedTree.find((t: any) => t.id === id);
                 if (!unlockedTalent) return;
                 const talentPointSpent = Array.from(updatedRanks.values()).reduce((a, b) => a + b, 0);
                 const isBlocked = restriction_lines_class_tree.some((restriction: any) =>
@@ -268,7 +288,7 @@ export default function SpecPage() {
 
 
     const renderTalentCell = (talent: any) => {
-        if (!talent) return <h5>-</h5>;
+        if (!talent) return <h6>-</h6>;
 
         const currentRank = talentRanks.get(talent.id) ?? 0;
         const rankSelected = talent.ranks[Math.min(currentRank, talent.ranks.length - 1)];
@@ -281,7 +301,7 @@ export default function SpecPage() {
                         const current = activeTalentIds.get(talentSelect.talentId) ?? 0;
                         return (
                             <div key={talentSelect.talentId} >
-                                <h5>{talentSelect.talentName ?? JSON.stringify(talentSelect)}</h5>
+                                <h6>{talentSelect.talentName ?? JSON.stringify(talentSelect)}</h6>
                                 <span>{current} / {talent.ranks.length}</span>
                             </div >
                         )
@@ -292,7 +312,7 @@ export default function SpecPage() {
         );
     };
 
-    const renderTalentTable = (talentTree : any) => {
+    const renderTalentTable = (talentTree: any) => {
         if (!talentTree || !Array.isArray(talentTree))
             return <div>No talent tree index available.</div>;
 
@@ -335,7 +355,7 @@ export default function SpecPage() {
                                                             {renderTalentCell(talent)}
                                                         </td >
                                                     ) : (
-                                                        <td key={colKey} data-key={colKey}></td>
+                                                        <td key={colKey} data-key={colKey} className={styles.hidden}></td>
                                                     )}
                                                 </>
                                             )
@@ -360,11 +380,11 @@ export default function SpecPage() {
             {error && <div style={{ color: 'crimson' }}>Error: {error}</div>}
 
             {!loading && !error && (
-                <div>
+                <div style={{ display: 'flex' }}>
                     {spec ? (
                         <>
 
-                            <div>
+                            <div className={styles.talentTree}>
                                 <h2>{spec.name?.['fr_FR'] ?? spec.name ?? `Spec ${specId}`}</h2>
                                 {spec.media && <img src={spec.media} alt={spec.name} style={{ width: 64 }} />}
                                 {spec.className && <div>Classe: {spec.className}</div>}
@@ -372,14 +392,14 @@ export default function SpecPage() {
                                 <h3 style={{ marginTop: 16 }}>Talent Class trees </h3>
                                 {renderTalentTable(classTree)}
                             </div>
-                            
-                            <div>
+
+                            <div className={styles.talentTree}>
                                 <h2>{spec.name?.['fr_FR'] ?? spec.name ?? `Spec ${specId}`}</h2>
                                 {spec.media && <img src={spec.media} alt={spec.name} style={{ width: 64 }} />}
                                 {spec.className && <div>Classe: {spec.className}</div>}
 
                                 <h3 style={{ marginTop: 16 }}>Talent Spec trees</h3>
-                                {renderTalentTable(classTree)}
+                                {renderTalentTable(specTree)}
                             </div>
                         </>
                     ) : (
@@ -399,7 +419,7 @@ export default function SpecPage() {
                                                 setShowPopup(false);
                                                 resolveTalentChoice.current?.(talentSelect.talentId);
                                             }}>
-                                                <h5>{talentSelect.talentName ?? JSON.stringify(talentSelect)}</h5>
+                                                <h6>{talentSelect.talentName ?? JSON.stringify(talentSelect)}</h6>
                                             </div >
                                         )
                                     })
