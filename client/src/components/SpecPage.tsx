@@ -1,5 +1,8 @@
-import { act, useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import styles from './SpecPage.module.css';
+
+
 
 export default function SpecPage() {
     const { specId } = useParams();
@@ -8,11 +11,19 @@ export default function SpecPage() {
     const [spec, setSpec] = useState<any | null>(null);
     const [restriction_lines_class_tree, setRestrictionLinesClassTree] = useState<any | null>(null);
 
+    //talent choice
+    const [showPopup, setShowPopup] = useState(false);
+    const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+    const [talentNodeSelected, setTalentNodeSelected] = useState<any | null>(null);
+    const resolveTalentChoice = useRef<(talentId: number) => void>(null);
+
+
     //talent tree class
     const [classTree, setClassTree] = useState<any | null>(null);
     const [talentRanks, setTalentRanks] = useState<Map<number, number>>(new Map());
-    const [activeTalentIds, setActiveTalentIds] = useState<Set<number>>(new Set());
-    const [selectableTalentIds, setSelectableTalentIds] = useState<Set<number>>(new Set());
+    const [activeTalentNodeIds, setActiveTalentNodeIds] = useState<Set<number>>(new Set());
+    const [selectableTalentNodeIds, setSelectableTalentNodeIds] = useState<Set<number>>(new Set());
+    const [activeTalentIds, setActiveTalentIds] = useState<Map<number, number>>(new Map());
 
     //talent tree spec
     const [specTree, setSpecTree] = useState<any | null>(null);
@@ -57,7 +68,7 @@ export default function SpecPage() {
                         const firstRowIds = bySpecJson.talentNodesClass
                             .filter((t: any) => t.displayRow === firstRow)
                             .map((t: any) => t.id);
-                        setSelectableTalentIds(new Set(firstRowIds));
+                        setSelectableTalentNodeIds(new Set(firstRowIds));
 
 
                     } else {
@@ -84,13 +95,15 @@ export default function SpecPage() {
         load()
     }, [specId])
 
-    const getActiveTalents = (updatedRanks: Map<number, number>) => {
+    const getActiveTalentsNode = (updatedRanks: Map<number, number>) => {
         const updatedActive = new Set<number>();
         updatedRanks.forEach((rank, id) => {
             if (rank > 0) updatedActive.add(id);
         });
         return updatedActive;
     };
+
+
 
 
     const getSelectableTalents = (updatedActive: Set<number>, updatedRanks: Map<number, number>) => {
@@ -133,47 +146,74 @@ export default function SpecPage() {
         return newSelectable;
     }
 
-    const handleTalentClick = (talent: any) => {
-        if (!talent || !selectableTalentIds.has(talent.id)) return;
 
-        setTalentRanks(prevRanks => {
-            const updatedRanks = new Map(prevRanks);
-            const currentRank = updatedRanks.get(talent.id) ?? 0;
+    const waitForTalentChoice = (talents: any[]): Promise<number> => {
+        return new Promise((resolve) => {
+            setTalentNodeSelected({ ranks: [{ talents }] });
+            setShowPopup(true);
 
-            // Vérifie si le rang maximum est atteint
-            if (currentRank >= talent.ranks.length) return prevRanks;
-
-            // Incrémente le rang du talent
-            updatedRanks.set(talent.id, currentRank + 1);
-
-            // Met à jour les talents actifs
-            const updatedActive = getActiveTalents(updatedRanks);
-            setActiveTalentIds(updatedActive);
-
-            // Recalcule les talents sélectionnables
-            const newSelectable = getSelectableTalents(updatedActive, updatedRanks);
-            setSelectableTalentIds(newSelectable);
-
-            return updatedRanks;
+            // On stocke le resolve dans un ref pour l'appeler plus tard
+            resolveTalentChoice.current = resolve;
         });
     };
 
+    const handleTalentClick = async (
+        event: React.MouseEvent<HTMLDivElement>,
+        talent: any
+    ) => {
+        if (!talent || !selectableTalentNodeIds.has(talent.id)) return;
+
+        const currentRank = talentRanks.get(talent.id) ?? 0;
+        if (currentRank >= talent.ranks.length) return;
+
+        let selectedTalentId: number;
+
+        //selection du choix si besoin
+        if (talent.type === "CHOICE") {
+            setTalentNodeSelected(talent);
+            setPopupPosition({ x: event.clientX, y: event.clientY });
+            setShowPopup(true);
+            selectedTalentId = await waitForTalentChoice(talent.ranks[0].talents);
+        } else {
+            selectedTalentId = talent.ranks[0].talents[0].talentId;
+        }
+
+        //Met a jour le rank du talent node
+        const updatedRanks = new Map(talentRanks);
+        updatedRanks.set(talent.id, currentRank + 1);
+        setTalentRanks(updatedRanks);
+
+        //Met a jour le rank du talent
+        activeTalentIds.set(selectedTalentId, currentRank + 1);
+
+        // Met à jour les talents node actifs
+        const updatedActive = getActiveTalentsNode(updatedRanks);
+        setActiveTalentNodeIds(updatedActive);
+
+        // Recalcule les talents sélectionnables
+        const newSelectable = getSelectableTalents(updatedActive, updatedRanks);
+        setSelectableTalentNodeIds(newSelectable);
+    };
+
+
+
+
     const handleTalentContextMenu = (talent: any) => {
-        if (!talent || !activeTalentIds.has(talent.id)) return;
+        if (!talent || !activeTalentNodeIds.has(talent.id)) return;
 
         //check si des talents dépendent de ce talent
-        const dependentActiveTalents = talent.unlocks.filter((id: number) => activeTalentIds.has(id));
+        const dependentActiveTalents = talent.unlocks.filter((id: number) => activeTalentNodeIds.has(id));
 
         const canRemove = dependentActiveTalents.every((id: number) => {
             const dependentActiveTalent = classTree.find((t: any) => t.id === id);
             const unlockBy = dependentActiveTalent?.lockedBy ?? [];
 
             // Vérifie s'il existe un autre talent actif qui débloque ce talent
-            const isUnlockedByOther = Array.from(activeTalentIds).some(
+            const isUnlockedByOther = Array.from(activeTalentNodeIds).some(
                 (activeId: number) => {
 
-                    let otherCanUnlock = unlockBy.includes(activeId) && activeId !== talent.id ;
-                    if(!otherCanUnlock) return false;
+                    let otherCanUnlock = unlockBy.includes(activeId) && activeId !== talent.id;
+                    if (!otherCanUnlock) return false;
 
                     //check si dans les talents qui peuvent le debloquer ils sont au rank max
                     let activeTalent = classTree.filter((t: any) => t.id == activeId)[0];
@@ -189,8 +229,6 @@ export default function SpecPage() {
 
         if (!canRemove) return;
 
-
-        // On regroupe tout dans une mise à jour synchronisée
         setTalentRanks(prevRanks => {
             const updatedRanks = new Map(prevRanks);
             const currentRank = updatedRanks.get(talent.id) ?? 0;
@@ -198,20 +236,36 @@ export default function SpecPage() {
             // Vérifie si le rang minimum est atteint
             if (currentRank == 0) return prevRanks;
 
-            // Décrémente le rang du talent
+            // Décrémente le rang du talent node
             updatedRanks.set(talent.id, currentRank - 1);
 
-            // Met à jour les talents actifs
-            const updatedActive = getActiveTalents(updatedRanks);
-            setActiveTalentIds(updatedActive);
+            //Met a jour le rank du talent
+            let selectedTalentId: number = 0;
+            if (talent.type === "CHOICE") {
+                talent.ranks[0].talents.forEach((talent: any) => {
+                    if (activeTalentIds.has(talent.talentId) && (activeTalentIds.get(talent.talentId) ?? 0) > 0) selectedTalentId = talent.talentId;
+                })
+            } else {
+                selectedTalentId = talent.ranks[0].talents[0].talentId;
+            }
+            activeTalentIds.set(selectedTalentId, currentRank - 1);
+
+            // Met à jour les talents node actifs
+            const updatedActive = getActiveTalentsNode(updatedRanks);
+            setActiveTalentNodeIds(updatedActive);
+
 
             // Recalcule les talents sélectionnables
             const newSelectable = getSelectableTalents(updatedActive, updatedRanks);
-            setSelectableTalentIds(newSelectable);
+            setSelectableTalentNodeIds(newSelectable);
+
 
             return updatedRanks;
         });
     };
+
+
+
 
     const renderTalentCell = (talent: any) => {
         if (!talent) return <h5>-</h5>;
@@ -219,42 +273,31 @@ export default function SpecPage() {
         const currentRank = talentRanks.get(talent.id) ?? 0;
         const rankSelected = talent.ranks[Math.min(currentRank, talent.ranks.length - 1)];
 
-        if (rankSelected.tooltip) {
-            return (
-                <>
-                    <h5>{rankSelected.tooltip.talent.name ?? JSON.stringify(talent)}</h5>
-                    <span>{currentRank} / {talent.ranks.length}</span>
-                </>
-            );
-        }
+        return (
+            <>
+                {rankSelected.talents.map((talentSelect: any) => {
 
-        if (rankSelected.choice_of_tooltips) {
-            return (
-                <>
-                    {rankSelected.choice_of_tooltips.map((tooltip: any) => (
-                        <div key={tooltip.talent.id}>
-                            <h5>{tooltip.talent.name ?? JSON.stringify(talent)}</h5>
-                            <span>{currentRank} / {talent.ranks.length}</span>
-                        </div>
-                    ))}
-                </>
-            );
-        }
-
-
-        return <h5>-</h5>;
+                    {
+                        const current = activeTalentIds.get(talentSelect.talentId) ?? 0;
+                        return (
+                            <div key={talentSelect.talentId} >
+                                <h5>{talentSelect.talentName ?? JSON.stringify(talentSelect)}</h5>
+                                <span>{current} / {talent.ranks.length}</span>
+                            </div >
+                        )
+                    }
+                })
+                }
+            </>
+        );
     };
 
-
-
-
-
-    const renderTalentTable = () => {
-        if (!classTree || !Array.isArray(classTree))
+    const renderTalentTable = (talentTree : any) => {
+        if (!talentTree || !Array.isArray(talentTree))
             return <div>No talent tree index available.</div>;
 
-        const maxRow = Math.max(...classTree.filter(t => (t.lockedBy || t.unlocks)).map(t => t.displayRow));
-        const maxCol = Math.max(...classTree.filter(t => (t.lockedBy || t.unlocks)).map(t => t.displayCol));
+        const maxRow = Math.max(...talentTree.filter(t => (t.lockedBy || t.unlocks)).map(t => t.displayRow));
+        const maxCol = Math.max(...talentTree.filter(t => (t.lockedBy || t.unlocks)).map(t => t.displayCol));
         return (
             <table>
                 <tbody>
@@ -264,16 +307,16 @@ export default function SpecPage() {
                         return (
                             <>
                                 {/* check si il y a des talents dans la ligne */}
-                                {classTree.find(t => t.displayRow === displayRowTalents && (t.lockedBy || t.unlocks)) && (
+                                {talentTree.find(t => t.displayRow === displayRowTalents && (t.lockedBy || t.unlocks)) && (
                                     <tr key={rowKey} id={rowKey}>
                                         {Array.from({ length: maxCol }).map((_, colIndex) => {
                                             const displayColTalents = colIndex + 1;
-                                            const talent = classTree.find(
+                                            const talent = talentTree.find(
                                                 t => t.displayRow === displayRowTalents && t.displayCol === displayColTalents
                                             );
                                             const talentUnlocks = talent?.unlocks ?? "";
-                                            const isActive = activeTalentIds.has(talent?.id);
-                                            const isSelectable = selectableTalentIds.has(talent?.id);
+                                            const isActive = activeTalentNodeIds.has(talent?.id);
+                                            const isSelectable = selectableTalentNodeIds.has(talent?.id);
 
 
                                             const colKey = rowKey + `-col-${displayColTalents}`
@@ -282,9 +325,9 @@ export default function SpecPage() {
                                                     {talent ? (
                                                         <td key={colKey} data-key={colKey} id={talent?.id} data-current-rank={talentRanks.get(talent.id) ?? 0} data-max-rank={talent.ranks.length} data-unlock={JSON.stringify(talentUnlocks)}
                                                             className={
-                                                                isActive ? 'active' : isSelectable ? 'selectable' : 'inactive'
+                                                                isActive ? styles.active : isSelectable ? styles.selectable : styles.inactive
                                                             }
-                                                            onClick={() => handleTalentClick(talent)}
+                                                            onClick={(event) => handleTalentClick(event, talent)}
                                                             onContextMenu={(event) => {
                                                                 event.preventDefault();
                                                                 handleTalentContextMenu(talent);
@@ -319,40 +362,60 @@ export default function SpecPage() {
             {!loading && !error && (
                 <div>
                     {spec ? (
-                        <div>
-                            <h2>{spec.name?.['fr_FR'] ?? spec.name ?? `Spec ${specId}`}</h2>
-                            {spec.media && <img src={spec.media} alt={spec.name} style={{ width: 64 }} />}
-                            {spec.className && <div>Classe: {spec.className}</div>}
+                        <>
 
-                            <h3 style={{ marginTop: 16 }}>Talent trees (index)</h3>
-                            {renderTalentTable()}
-                        </div>
+                            <div>
+                                <h2>{spec.name?.['fr_FR'] ?? spec.name ?? `Spec ${specId}`}</h2>
+                                {spec.media && <img src={spec.media} alt={spec.name} style={{ width: 64 }} />}
+                                {spec.className && <div>Classe: {spec.className}</div>}
+
+                                <h3 style={{ marginTop: 16 }}>Talent Class trees </h3>
+                                {renderTalentTable(classTree)}
+                            </div>
+                            
+                            <div>
+                                <h2>{spec.name?.['fr_FR'] ?? spec.name ?? `Spec ${specId}`}</h2>
+                                {spec.media && <img src={spec.media} alt={spec.name} style={{ width: 64 }} />}
+                                {spec.className && <div>Classe: {spec.className}</div>}
+
+                                <h3 style={{ marginTop: 16 }}>Talent Spec trees</h3>
+                                {renderTalentTable(classTree)}
+                            </div>
+                        </>
                     ) : (
                         <div>Spécialisation introuvable (id {specId})</div>
                     )}
+
+                    {showPopup && (
+                        <div className={styles.popupBlur} onClick={() => setShowPopup(false)}>
+                            <div className={styles.popupChoice}
+                                style={{ top: popupPosition.y, left: popupPosition.x }}
+                                onClick={(e) => e.stopPropagation()} // empêche la fermeture si on clique dans la popup
+                            >
+                                {
+                                    talentNodeSelected.ranks[0].talents.map((talentSelect: any) => {
+                                        return (
+                                            <div key={'choice_' + talentSelect.talentId} onClick={() => {
+                                                setShowPopup(false);
+                                                resolveTalentChoice.current?.(talentSelect.talentId);
+                                            }}>
+                                                <h5>{talentSelect.talentName ?? JSON.stringify(talentSelect)}</h5>
+                                            </div >
+                                        )
+                                    })
+                                }
+                            </div>
+                        </div>
+
+
+                    )}
+
+
                 </div>
             )}
 
             <style>{`
-        td {
-          border: 1px solid;
-          padding: 8px;
-          cursor: pointer;
-          transition: background-color 0.3s ease;
-        }
-        td.inactive {
-          opacity: 0.2;
-          pointer-events: none;
-        }
-        td.selectable {
-          opacity: 1;
-          background-color: lightblue;
-          color: black;
-        }
-        td.active {
-          background-color: green;
-          font-weight: bold;
-        }
+            
 
       `}</style>
         </div>
