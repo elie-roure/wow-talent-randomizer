@@ -1,29 +1,25 @@
 {
-  "name": "wow-talent-random",
-  "version": "0.1.0",
+  "name": "wow-talent-randomizer-server",
+  "version": "1.0.0",
   "private": true,
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint . --ext .ts",
     "test": "jest --passWithNoTests --runInBand",
     "format": "prettier --write ."
   },
   "dependencies": {
     "dotenv": "^16.0.0",
-    "express": "^4.18.2",
-    "express-session": "^1.17.3",
-    "passport": "^0.6.0",
-    "passport-bnet": "^1.0.0",
-    "wow-talent-random-monorepo": "file:.."
+    "express": "^4.18.2"
   },
   "devDependencies": {
     "@types/express": "^4.17.17",
-    "@types/express-session": "^1.17.5",
     "@types/jest": "^29.5.3",
-    "@types/passport": "^1.0.9",
+    "@types/node": "^24.6.0",
     "@types/supertest": "^2.0.12",
     "@typescript-eslint/eslint-plugin": "^6.12.0",
     "@typescript-eslint/parser": "^6.12.0",

@@ -1,15 +1,14 @@
 {
-  "name": "wow-talent-random-monorepo",
+  "name": "wow-talent-randomizer",
   "private": true,
   "scripts": {
-    "start:server": "npm --prefix server run start",
-    "dev:server": "npm --prefix server run dev",
-    "install:server": "npm --prefix server install",
-    "start:client": "npm --prefix client run dev",
-    "build:client": "npm --prefix client run build",
-    "install:client": "npm --prefix client install",
-    "build": "npm run build:client && npm --prefix server run build",
-    "dev": "concurrently \"npm run dev:server\" \"npm run start:client\""
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n server,client -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build": "npm --prefix client run build && npm --prefix server run build",
+    "test": "npm --prefix server test && npm --prefix client test",
+    "lint": "npm --prefix server run lint && npm --prefix client run lint",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
